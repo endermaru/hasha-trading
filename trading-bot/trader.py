@@ -32,15 +32,15 @@ else:
     logger.warning("API keys not found. Running in simulation mode.")
 
 
-def fetch_latest_candle(ticker: str = TICKER, interval: str = "minute240") -> pd.DataFrame | None:
+def fetch_latest_candle(ticker: str = TICKER, interval: str = "minute240", count: int = 2) -> pd.DataFrame | None:
     """
-    Upbit API를 호출하여 가장 최신의 완성된 4시간봉 캔들 1개를 가져옵니다.
+    Upbit API를 호출하여 지정된 개수의 최신 4시간봉 캔들을 가져옵니다.
     'Open', 'High', 'Low', 'Close', 'Volume' 5개의 열로 구성된 DataFrame을 반환합니다.
     """
     logger.info(f"Fetching latest candle for {ticker} with interval {interval}...")
     try:
         # pyupbit.get_ohlcv는 가장 최신 봉부터 가져옵니다. count=1은 가장 최근에 완성된 봉 1개를 의미합니다.
-        df = pyupbit.get_ohlcv(ticker, interval=interval, count=1)
+        df = pyupbit.get_ohlcv(ticker, interval=interval, count=count)
         
         if df is None or df.empty:
             logger.error("Failed to fetch candle data from Upbit.")
@@ -57,6 +57,42 @@ def fetch_latest_candle(ticker: str = TICKER, interval: str = "minute240") -> pd
         logger.error(f"An error occurred while fetching candle data: {e}")
         return None
 
+
+def fetch_historical_candles_simple(ticker: str = "KRW-BTC", interval: str = "minute240") -> pd.DataFrame | None:
+    """
+    Upbit API를 두 번 호출하여 총 400개의 4시간봉 캔들을 가져옵니다.
+    """
+    logger.info("Fetching 400 historical candles in two chunks...")
+    try:
+        df1 = pyupbit.get_ohlcv(ticker, interval=interval, count=200)
+        if df1 is None or df1.empty:
+            logger.error("Failed to fetch candles.")
+            return None
+        time.sleep(0.2)
+        oldest_timestamp = df1.index[0] - pd.Timedelta(hours=9)
+        df2 = pyupbit.get_ohlcv(ticker, interval=interval, count=200, to=oldest_timestamp)
+        if df2 is None or df2.empty:
+            logger.error("Failed to fetch candles.")
+            return None
+
+        df_total = pd.concat([df2, df1])
+
+        # 컬럼명 정리
+        df_total.columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Value']
+        df_total.drop(columns=['Value'], inplace=True)
+        
+        # 시간대(Timezone)를 UTC로 통일
+        df_total.index = df_total.index.tz_localize('Asia/Seoul').tz_convert('UTC')
+        
+        # 시간순으로 정렬
+        df_total.sort_index(inplace=True)
+        
+        logger.info(f"Successfully fetched a total of {len(df_total)} candles.")
+        return df_total
+    
+    except Exception as e:
+        logger.error(f"An error occurred while fetching historical candles: {e}")
+        return None
 
 def fetch_portfolio_state() -> dict:
     """현재 포트폴리오 상태를 불러옵니다."""

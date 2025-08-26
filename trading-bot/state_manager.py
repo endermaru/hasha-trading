@@ -8,7 +8,7 @@ import pyupbit
 
 # --- 설정 및 경로 정의 ---
 DATA_DIR = Path("data")
-CANDLE_DATA_PATH = DATA_DIR / "recent_candles.csv"
+CANDLE_DATA_PATH = DATA_DIR / "recent_candles.csv" 
 LOG_PATH = DATA_DIR / "trade_history.csv"
 
 # 데이터 디렉토리가 없으면 생성
@@ -23,7 +23,9 @@ def load_recent_candles() -> pd.DataFrame:
     try:
         df = pd.read_csv(CANDLE_DATA_PATH, encoding="utf-8-sig", index_col=0, parse_dates=True)
         df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+        # df.index = df.index.tz_localize('UTC') 
         logger.info(f"Loaded {len(df)} recent candles.")
+        logger.info(f"Data range from {df.index[0]} to {df.index[-1]}.")
         return df
     except Exception as e:
         logger.error(f"Error loading candle data: {e}")
