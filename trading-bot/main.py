@@ -1,5 +1,5 @@
 # main.py
-# uvicorn main:app --reload
+# uvicorn main:app --reload --host 0.0.0.0
 import logging
 from fastapi import FastAPI, BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

@@ -9,8 +9,8 @@ from keras.models import load_model
 
 # --- 설정값 ---
 LOOKBACK_WINDOW = 30
-ENTRY_THRESHOLD = 0.2  # 최적화된 값으로 수정하세요
-EXIT_THRESHOLD = 0.42   # 최적화된 값으로 수정하세요
+ENTRY_THRESHOLD = 0.22  # 최적화된 값으로 수정하세요
+EXIT_THRESHOLD = 0.55   # 최적화된 값으로 수정하세요
 
  # 일봉 SMA(50) 계산에 필요한 최소 300개와 약간의 여유분을 고려합니다.
 # LOOKBACK_WINDOW(30)보다 훨씬 긴 기간이 필요합니다.

@@ -60,3 +60,7 @@ data/data.csv
 
 # Old Files
 data/Old/*
+
+# freq chaning dirs
+trading-bot/data/*
+
