@@ -1,0 +1,17 @@
+# --- Web Framework & Server ---
+fastapi
+uvicorn[standard]
+
+# --- Scheduling ---
+apscheduler
+
+# --- Data Handling & Analysis ---
+pandas
+numpy==1.26.3
+pandas-ta
+scikit-learn
+pyupbit
+
+# --- ML/DL Framework (Stable Versions) ---
+tensorflow==2.16.1
+protobuf==4.25.3
