@@ -152,7 +152,7 @@ def _wait_for_order_completion(order_uuid: str, max_wait_sec: int = 60) -> dict 
     return None
 
 
-def execute_order(signal: str, portfolio: dict) -> tuple[dict, dict | None]:
+def execute_order(signal: str, portfolio: dict) -> dict | None:
     """
     예측 신호에 따라 실제 거래를 실행하고 포트폴리오 상태를 업데이트합니다.
     """
@@ -170,7 +170,8 @@ def execute_order(signal: str, portfolio: dict) -> tuple[dict, dict | None]:
         return None
     
     # --- 매수 로직 ---
-    if signal == 'buy' and not portfolio.get('in_position', False):
+    # if signal == 'buy' and not portfolio.get('in_position', False): # 물타기, 불타기 방지 가드
+    if signal == 'buy':
         available_cash = portfolio.get('cash', 0)
         cash_for_buy = available_cash / (1 + TAKER_FEE_RATE)
         
@@ -217,7 +218,7 @@ def execute_order(signal: str, portfolio: dict) -> tuple[dict, dict | None]:
             return None
 
     # --- 매도 로직 ---
-    elif signal == 'sell' and portfolio.get('in_position', False):
+    elif signal == 'sell':
         position_size_to_sell = portfolio.get('position_size', 0)
         if position_size_to_sell > 0:
             logger.info(f"매도 신호 확인. 보유 수량({position_size_to_sell}) 전체에 대해 시장가 매도 주문 실행.")
@@ -249,12 +250,22 @@ def execute_order(signal: str, portfolio: dict) -> tuple[dict, dict | None]:
                         'fee': fee
                     }
                     logger.info(f"매도 주문 체결 완료: {trade_log}")
-
             except Exception as e:
                 logger.error(f"매도 주문 실행 중 예외 발생: {e}")
                 return None
+    elif signal == 'hold':
+        trade_log = {
+            'timestamp': str(pd.Timestamp.now(tz='UTC')), 
+            'signal': 'HOLD', 
+            'price': current_price, 
+            'size': 0,
+            'fee': 0,
+        }
+        logger.info(f"보유 신호 확인. 현재 포지션을 유지합니다: {trade_log}")
+        return trade_log
     else:
         logger.info(f"신호 '{signal}' 또는 포지션 상태가 주문 조건에 맞지 않아 거래를 실행하지 않습니다.")
+        return None
 
     return trade_log
 
