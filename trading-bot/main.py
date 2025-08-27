@@ -70,7 +70,7 @@ def run_trading_logic():
     signal = predictor.generate_signal(updated_candles)
 
     # 5. 주문 실행 (from trader)
-    trade_log = trader.execute_order_dummy(signal, portfolio_state)
+    trade_log = trader.execute_order(signal, portfolio_state)
 
     # 6. 상태 저장 (from state_manager)
     state_manager.save_recent_candles(updated_candles)
