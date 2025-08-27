@@ -26,7 +26,7 @@ scheduler = AsyncIOScheduler(timezone='UTC')
 MIN_CANDLE_COUNT = 400
 
 # --- 핵심 트레이딩 로직 ---
-def run_trading_logic():
+def run_trading_logic(signal=None):
     """
     모듈들을 조립하여 전체 트레이딩 사이클을 실행합니다.
     """
@@ -67,7 +67,8 @@ def run_trading_logic():
         return
     
     # 4. 신호 생성 (from predictor)
-    signal = predictor.generate_signal(updated_candles)
+    if signal == None:
+        signal, _ = predictor.generate_signal(updated_candles)
 
     # 5. 주문 실행 (from trader)
     trade_log = trader.execute_order(signal, portfolio_state)
@@ -112,11 +113,37 @@ def read_root():
     return {"status": "Trading bot is running"}
 
 @app.post("/trade/trigger", tags=["Trading"])
-async def trigger_manual_trade(background_tasks: BackgroundTasks):
+async def trigger_manual_trade(background_tasks: BackgroundTasks, signal=None):
     """트레이딩 로직을 1회 수동으로 실행합니다."""
     logger.info("Manual trade trigger requested via API.")
-    background_tasks.add_task(run_trading_logic)
+    background_tasks.add_task(run_trading_logic, signal)
     return {"status": "success", "message": "Trading logic triggered in the background."}
+
+@app.get("/trade/prediction", tags=["Trading"])
+def get_trade_prediction():
+    """현재 시장 상황에 대한 모델 예측을 조회합니다."""
+    logger.info("Fetching signal prediction using model.")
+    recent_candles_df = state_manager.load_recent_candles()
+    if recent_candles_df.empty or len(recent_candles_df) < MIN_CANDLE_COUNT:
+        candles_df = trader.fetch_historical_candles_simple()
+        if candles_df is None or candles_df.empty:
+            raise HTTPException(
+                status_code=502, # Bad Gateway
+                detail="Upbit API에서 캔들 데이터를 가져오는 데 실패했습니다."
+            )
+        # 2. 데이터 저장하기
+        state_manager.save_recent_candles(candles_df)
+    
+
+    # 3. 모델 예측 생성
+    signal, probs = predictor.generate_signal(recent_candles_df)
+    if signal is None:
+        raise HTTPException(
+            status_code=502, # Bad Gateway
+            detail="모델 예측 생성에 실패했습니다."
+        )
+    return {"signal": signal, "probabilities": {"loss": probs[0], "hold": probs[1], "profit": probs[2]}}
+
 
 @app.get("/status/portfolio", tags=["Status"])
 def get_portfolio_status():
@@ -158,7 +185,6 @@ def get_scheduler_status():
         "is_scheduled": True,
         "is_running": scheduler.running,
         "next_run_time_utc": next_run.astimezone(timezone.utc).isoformat(),
-        "next_run_time_kst": next_run.isoformat(),
         "time_until_next_run": {
             "str": remaining_str,
             "total_seconds": round(seconds)

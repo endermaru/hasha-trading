@@ -133,30 +133,45 @@ def fetch_portfolio_state() -> dict:
 def _wait_for_order_completion(order_uuid: str, max_wait_sec: int = 60) -> dict | None:
     """
     특정 주문(uuid)이 체결 완료될 때까지 대기합니다.
+    'done' 또는 'cancel'이며 executed_volume > 0 이면 체결로 간주.
     """
     start_time = time.time()
     logger.info(f"주문 완료 대기 시작. UUID: {order_uuid}")
+    order_status = None
     while time.time() - start_time < max_wait_sec:
         try:
             # 개별 주문 조회를 통해 정확한 상태를 확인
             order_status = upbit.get_order(order_uuid)
-            if order_status and order_status.get('state') == 'done':
-                logger.info(f"Order {order_uuid} completed.")
-                return order_status
+            if order_status:
+                state = order_status.get('state')
+                executed_volume = float(order_status.get('executed_volume', 0))
+                if state in ('done', 'cancel') and executed_volume > 0:
+                    logger.info(f"Order {order_uuid} 완료 또는 취소(실제 체결 완료), 상태: {state}, 체결량: {executed_volume}")
+                    return order_status
+                elif state == "cancel" and executed_volume == 0:
+                    logger.warning(f"Order {order_uuid} 취소, 미체결 (잔량 체결 없음).")
+                    return order_status
         except Exception as e:
             logger.error(f"Error checking order status for {order_uuid}: {e}")
         
         time.sleep(0.5)
 
     logger.error(f"Order {order_uuid} did not complete within {max_wait_sec} seconds.")
-    return None
+    return order_status
 
 
-def execute_order(signal: str, portfolio: dict) -> dict | None:
+def execute_order(signal: str, portfolio: dict) -> dict:
     """
     예측 신호에 따라 실제 거래를 실행하고 포트폴리오 상태를 업데이트합니다.
     """
-    trade_log = None
+    trade_log = {
+            'timestamp': str(pd.Timestamp.now(tz='UTC')),
+            'uuid': '',
+            'signal': 'HOLD', 
+            'price': 0, 
+            'size': 0,
+            'fee': 0,
+        }
 
     # --- 실시간 현재가 조회 ---
     try:
@@ -164,11 +179,15 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
         time.sleep(0.1)
         if current_price is None:
             logger.error("현재가를 조회할 수 없습니다. 주문 실행을 중단합니다.")
-            return None
+            trade_log['signal'] = 'ERROR'
+            return trade_log
     except Exception as e:
         logger.error(f"현재가 조회 중 예외 발생: {e}. 주문 실행을 중단합니다.")
-        return None
-    
+        trade_log['signal'] = 'ERROR'
+        return trade_log
+
+    trade_log['price'] = current_price
+
     # --- 매수 로직 ---
     # if signal == 'buy' and not portfolio.get('in_position', False): # 물타기, 불타기 방지 가드
     if signal == 'buy':
@@ -178,7 +197,8 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
         # 최소 주문 금액 확인
         if cash_for_buy < MIN_ORDER_AMOUNT_KRW:
             logger.warning(f"가용 현금({available_cash:,.0f}원)으로 매수 가능한 금액({cash_for_buy:,.0f}원)이 최소 주문 금액({MIN_ORDER_AMOUNT_KRW:,.0f}원)보다 작아 주문을 실행하지 않습니다.")
-            return None
+            trade_log['signal'] = 'HOLD'
+            return trade_log
 
         logger.info(f"매수 신호 확인. 시장가 매수 주문 실행. 주문액: {cash_for_buy:,.0f}원 (가용 현금: {available_cash:,.0f}원)")
 
@@ -187,8 +207,9 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
             order_result = upbit.buy_market_order(TICKER, cash_for_buy)
             if not (order_result and 'uuid' in order_result):
                 logger.error(f"매수 주문 제출 실패: {order_result}")
-                return None
-            
+                trade_log['signal'] = 'ERROR'
+                return trade_log
+
             order_uuid = order_result['uuid']
             logger.info(f"매수 주문 제출 완료. UUID: {order_uuid}")
 
@@ -206,6 +227,7 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
 
                 trade_log = {
                     'timestamp': str(pd.Timestamp.now(tz='UTC')), 
+                    'uuid': str(completed_order.get('uuid', '')),
                     'signal': 'BUY', 
                     'price': avg_price, 
                     'size': executed_volume, 
@@ -215,7 +237,8 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
 
         except Exception as e:
             logger.error(f"매수 주문 실행 중 예외 발생: {e}")
-            return None
+            trade_log['signal'] = 'ERROR'
+            return trade_log
 
     # --- 매도 로직 ---
     elif signal == 'sell':
@@ -226,8 +249,9 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
                 order_result = upbit.sell_market_order(TICKER, position_size_to_sell)
                 if not (order_result and 'uuid' in order_result):
                     logger.error(f"매도 주문 제출 실패: {order_result}")
-                    return None
-                
+                    trade_log['signal'] = 'ERROR'
+                    return trade_log
+
                 order_uuid = order_result['uuid']
                 logger.info(f"매도 주문 제출 완료. UUID: {order_uuid}")
 
@@ -244,6 +268,7 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
 
                     trade_log = {
                         'timestamp': str(pd.Timestamp.now(tz='UTC')), 
+                        'uuid': str(completed_order.get('uuid', '')),
                         'signal': 'SELL', 
                         'price': avg_price, 
                         'size': executed_volume,
@@ -252,30 +277,35 @@ def execute_order(signal: str, portfolio: dict) -> dict | None:
                     logger.info(f"매도 주문 체결 완료: {trade_log}")
             except Exception as e:
                 logger.error(f"매도 주문 실행 중 예외 발생: {e}")
-                return None
+                trade_log['signal'] = 'ERROR'
+                return trade_log
+        else:
+            logger.info(f"매도 신호를 확인했지만 포지션의 크기가 없습니다: {trade_log}")
+            return trade_log
     elif signal == 'hold':
-        trade_log = {
-            'timestamp': str(pd.Timestamp.now(tz='UTC')), 
-            'signal': 'HOLD', 
-            'price': current_price, 
-            'size': 0,
-            'fee': 0,
-        }
         logger.info(f"보유 신호 확인. 현재 포지션을 유지합니다: {trade_log}")
         return trade_log
     else:
         logger.info(f"신호 '{signal}' 또는 포지션 상태가 주문 조건에 맞지 않아 거래를 실행하지 않습니다.")
-        return None
+        trade_log['signal'] = 'ERROR'
+        return trade_log
 
     return trade_log
 
 
-def execute_order_dummy(signal: str, portfolio: dict) -> dict | None:
+def execute_order_dummy(signal: str, portfolio: dict) -> dict:
     """
     API 키가 없을 때 실제 주문 없이 거래를 시뮬레이션하고 거래 로그를 반환합니다.
     실제 execute_order 함수와 동일한 입력과 출력을 가지도록 설계되었습니다.
     """
-    trade_log = None
+    trade_log = {
+            'timestamp': str(pd.Timestamp.now(tz='UTC')), 
+            'uuid': '',
+            'signal': 'HOLD', 
+            'price': 0, 
+            'size': 0,
+            'fee': 0,
+        }
     logger.info("--- 시뮬레이션 모드로 주문 실행 ---")
 
     # --- 시뮬레이션을 위한 실시간 현재가 조회 ---
@@ -283,14 +313,18 @@ def execute_order_dummy(signal: str, portfolio: dict) -> dict | None:
         current_price = pyupbit.get_current_price(TICKER)
         if current_price is None:
             logger.error("[시뮬레이션] 현재가를 조회할 수 없어 더미 주문을 중단합니다.")
-            return None
+            trade_log['signal'] = 'ERROR'
+            return trade_log
         logger.info(f"[시뮬레이션] 현재가: {current_price:,.0f}원")
     except Exception as e:
         logger.error(f"[시뮬레이션] 현재가 조회 중 예외 발생: {e}. 더미 주문을 중단합니다.")
-        return None
+        trade_log['signal'] = 'ERROR'
+        return trade_log
+    
+    trade_log['price'] = current_price
 
     # --- 매수 시뮬레이션 로직 ---
-    if signal == 'buy' and not portfolio.get('in_position', False):
+    if signal == 'buy':
         available_cash = portfolio.get('cash', 0)
         
         # 전체 현금을 사용하여 매수할 수 있는 최대 주문 금액을 계산
@@ -298,7 +332,8 @@ def execute_order_dummy(signal: str, portfolio: dict) -> dict | None:
         
         if cash_for_buy < MIN_ORDER_AMOUNT_KRW:
             logger.warning(f"[시뮬레이션] 계산된 매수 금액({cash_for_buy:,.0f}원)이 최소 주문 금액({MIN_ORDER_AMOUNT_KRW:,.0f}원)보다 작습니다.")
-            return None
+            trade_log['signal'] = 'ERROR'
+            return trade_log
 
         logger.info(f"[시뮬레이션] 매수 신호 확인. {cash_for_buy:,.0f}원 상당의 가상 매수 실행.")
         
@@ -316,7 +351,7 @@ def execute_order_dummy(signal: str, portfolio: dict) -> dict | None:
         logger.info(f"[시뮬레이션] 가상 매수 체결 완료: {trade_log}")
 
     # --- 매도 시뮬레이션 로직 ---
-    elif signal == 'sell' and portfolio.get('in_position', False):
+    elif signal == 'sell':
         position_size_to_sell = portfolio.get('position_size', 0)
         if position_size_to_sell > 0:
             logger.info(f"[시뮬레이션] 매도 신호 확인. 보유 수량({position_size_to_sell}) 전체에 대해 가상 매도 실행.")
@@ -333,8 +368,20 @@ def execute_order_dummy(signal: str, portfolio: dict) -> dict | None:
                 'fee': fee
             }
             logger.info(f"[시뮬레이션] 가상 매도 체결 완료: {trade_log}")
-            
+    elif signal == 'hold':
+        trade_log = {
+            'timestamp': str(pd.Timestamp.now(tz='UTC')), 
+            'signal': 'HOLD', 
+            'price': current_price, 
+            'size': 0,
+            'fee': 0,
+        }
+        logger.info(f"보유 신호 확인. 현재 포지션을 유지합니다: {trade_log}")
+        return trade_log        
     else:
         logger.info(f"[시뮬레이션] 신호 '{signal}' 또는 포지션 상태가 주문 조건에 맞지 않아 거래를 실행하지 않습니다.")
+        trade_log['signal'] = 'ERROR'
+        return trade_log
 
+    # trade_log['signal'] = 'ERROR'
     return trade_log
