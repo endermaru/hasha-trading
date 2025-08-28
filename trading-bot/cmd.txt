@@ -1,3 +1,5 @@
+source ~/venv/bin/activate
+
 nohup uvicorn main:app --reload --host 0.0.0.0 >> server.log 2>&1 &
 
 tail -f server.log
