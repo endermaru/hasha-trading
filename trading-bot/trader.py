@@ -160,10 +160,11 @@ def _wait_for_order_completion(order_uuid: str, max_wait_sec: int = 60) -> dict 
     return order_status
 
 
-def execute_order(signal: str, portfolio: dict) -> dict:
+def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
     """
     예측 신호에 따라 실제 거래를 실행하고 포트폴리오 상태를 업데이트합니다.
     """
+    prob_loss, prob_hold, prob_profit = probs
     trade_log = {
             'timestamp': str(pd.Timestamp.now(tz='UTC')),
             'uuid': '',
@@ -171,6 +172,9 @@ def execute_order(signal: str, portfolio: dict) -> dict:
             'price': 0, 
             'size': 0,
             'fee': 0,
+            'prob_loss': prob_loss,
+            'prob_hold': prob_hold,
+            'prob_profit': prob_profit
         }
 
     # --- 실시간 현재가 조회 ---
@@ -293,11 +297,12 @@ def execute_order(signal: str, portfolio: dict) -> dict:
     return trade_log
 
 
-def execute_order_dummy(signal: str, portfolio: dict) -> dict:
+def execute_order_dummy(signal: str, probs: list[float], portfolio: dict) -> dict:
     """
     API 키가 없을 때 실제 주문 없이 거래를 시뮬레이션하고 거래 로그를 반환합니다.
     실제 execute_order 함수와 동일한 입력과 출력을 가지도록 설계되었습니다.
     """
+    prob_loss, prob_hold, prob_profit = probs
     trade_log = {
             'timestamp': str(pd.Timestamp.now(tz='UTC')), 
             'uuid': '',
@@ -305,6 +310,9 @@ def execute_order_dummy(signal: str, portfolio: dict) -> dict:
             'price': 0, 
             'size': 0,
             'fee': 0,
+            'prob_loss': prob_loss,
+            'prob_hold': prob_hold,
+            'prob_profit': prob_profit
         }
     logger.info("--- 시뮬레이션 모드로 주문 실행 ---")
 
