@@ -8,7 +8,8 @@ from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 import pandas as pd
 from datetime import datetime, timezone
-
+from dotenv import load_dotenv
+import os
 # --- 모듈 임포트 ---
 # 각 기능별로 분리된 모듈을 가져옵니다.
 import state_manager
@@ -22,6 +23,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler(timezone='UTC')
+
+load_dotenv()
+pswd = os.getenv("pswd")
 
 MIN_CANDLE_COUNT = 400
 
