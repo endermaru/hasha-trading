@@ -89,7 +89,7 @@ def make_slack_messages(result_message: str, portfolio_state: dict, probs: list,
     else:
         table_rows = []
         # --- 테이블 헤더 ---
-        header = f"{'Time(UTC)':<12}{'SIGNAL':>6}{'PRICE':>15}{'SIZE':>10}{'FEE':>10}{'LOSS(%)':>10}{'HOLD(%)':>10}{'PRFT(%)':>10}"
+        header = f"{'Time(UTC)':<12}{'SIGNAL':>6}{'PRICE':>15}{'SIZE':>15}{'FEE':>10}{'LOSS(%)':>10}{'HOLD(%)':>10}{'PRFT(%)':>10}"
         table_rows.append(header)
         table_rows.append("-" * len(header)) # 구분선
 
@@ -126,7 +126,7 @@ def make_slack_messages(result_message: str, portfolio_state: dict, probs: list,
             # f-string의 정렬 기능을 이용해 각 열의 너비를 맞춥니다.
             # :<15 : 왼쪽 정렬, 15칸
             # :>15 : 오른쪽 정렬, 15칸
-            row_str = f"{time_str:<12}{signal_str:>6}{price_str:>15}{size_str:>10}{fee_str:>10}{prob_loss:>10}{prob_hold:>10}{prob_profit:>10}"
+            row_str = f"{time_str:<12}{signal_str:>6}{price_str:>15}{size_str:>15}{fee_str:>10}{prob_loss:>10}{prob_hold:>10}{prob_profit:>10}"
             table_rows.append(row_str)
             
         # 모든 행을 합쳐서 하나의 문자열로 만듭니다.
