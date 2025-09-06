@@ -229,10 +229,10 @@ async def call_slack_bot(payload: str = Form(...)):
     # Slack이 보낸 payload는 URL-encoded된 JSON 문자열이므로 파싱합니다.
     interaction_data = json.loads(payload)
     
-    # actions 리스트의 첫 번째 요소에 필요한 정보가 들어있습니다.
     action = interaction_data.get("actions", [{}])[0]
     action_id = action.get("action_id")
     request_id = action.get("value")
+    callback_id = interaction_data.get("callback_id")
 
     sched = get_scheduler_status()
     port = trader.fetch_portfolio_state()
@@ -242,13 +242,13 @@ async def call_slack_bot(payload: str = Form(...)):
     logs_recent_10 = logs_recent_10.replace([np.inf, -np.inf], None).replace({np.nan: None})
     probs = logs_recent_10.iloc[-1][['prob_loss', 'prob_hold', 'prob_profit']].tolist() if not logs_recent_10.empty else [0.0, 0.0, 0.0]
 
-    if action_id == "button_get_status":
+    if callback_id == "button_get_status" or action_id == "button_get_status":
         # print(f"요청 ID '{request_id}'가 승인되었습니다.")
         message = slack_bot.make_slack_messages("💸 현재 상태 조회", port, probs, sched, None)
         slack_bot.post_message_blocks(message)
 
 
-    elif action_id == "button_get_logs":
+    elif callback_id == "button_get_logs" or action_id == "button_get_logs":
         # print(f"요청 ID '{request_id}'가 반려되었습니다.")
         message = slack_bot.make_slack_messages("📝 최근 거래 로그", port, probs, sched, logs_recent_10)
         slack_bot.post_message_blocks(message)
