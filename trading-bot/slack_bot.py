@@ -106,9 +106,17 @@ def make_slack_messages(result_message: str, portfolio_state: dict, probs: list,
                 'ERROR': 'ERR'
             }
             signal_str = signal_map.get(row.get('signal', 'HOLD').upper(), 'HOLD ⏸️')
-            prob_loss = f"{row.get('prob_loss', 0)*100:.2f}%"
-            prob_hold = f"{row.get('prob_hold', 0)*100:.2f}%"
-            prob_profit = f"{row.get('prob_profit', 0)*100:.2f}%"
+            # prob_loss
+            prob_loss_value = row.get('prob_loss')
+            prob_loss = f"{prob_loss_value * 100:.2f}%" if prob_loss_value is not None else "0.00%"
+
+            # prob_hold
+            prob_hold_value = row.get('prob_hold')
+            prob_hold = f"{prob_hold_value * 100:.2f}%" if prob_hold_value is not None else "0.00%"
+
+            # prob_profit
+            prob_profit_value = row.get('prob_profit')
+            prob_profit = f"{prob_profit_value * 100:.2f}%" if prob_profit_value is not None else "0.00%"
             fee = row.get('fee', 0)
             
             price_str = f"₩ {row['price']:,.0f}"
