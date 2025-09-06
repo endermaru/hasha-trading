@@ -1,7 +1,7 @@
 # main.py
 # uvicorn main:app --reload --host 0.0.0.0
 import logging
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, status
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
@@ -26,6 +26,15 @@ scheduler = AsyncIOScheduler(timezone='UTC')
 
 load_dotenv()
 pswd = os.getenv("pswd")
+
+# 비밀번호 검증을 위한 의존성 함수
+async def verify_password(password: str):
+    if password != pswd:
+        logger.error("Invalid password provided for API access.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, # 403 Forbidden 에러
+            detail="Invalid password.",
+        )
 
 MIN_CANDLE_COUNT = 400
 
@@ -118,21 +127,15 @@ def read_root():
     return {"status": "Trading bot is running"}
 
 @app.post("/trade/trigger", tags=["Trading"])
-async def trigger_manual_trade(background_tasks: BackgroundTasks, password:str, signal=None):
+async def trigger_manual_trade(background_tasks: BackgroundTasks, password:str, signal=None, _ = Depends(verify_password)):
     """트레이딩 로직을 1회 수동으로 실행합니다."""
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     logger.info("Manual trade trigger requested via API.")
     background_tasks.add_task(run_trading_logic, signal)
     return {"status": "success", "message": "Trading logic triggered in the background."}
 
 @app.get("/trade/prediction", tags=["Trading"])
-def get_trade_prediction(password:str):
+def get_trade_prediction(_ = Depends(verify_password)):
     """현재 시장 상황에 대한 모델 예측을 조회합니다."""
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     logger.info("Fetching signal prediction using model.")
     recent_candles_df = state_manager.load_recent_candles()
     if recent_candles_df.empty or len(recent_candles_df) < MIN_CANDLE_COUNT:
@@ -157,20 +160,14 @@ def get_trade_prediction(password:str):
 
 
 @app.get("/status/portfolio", tags=["Status"])
-def get_portfolio_status(password:str):
+def get_portfolio_status():
     """현재 포트폴리오 상태를 조회합니다."""
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     logger.info("Fetching portfolio status via API.")
     return trader.fetch_portfolio_state()
 
 @app.get("/status/logs", tags=["Status"])
-def get_trade_logs(password:str):
+def get_trade_logs():
     """거래 기록을 조회합니다."""
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     log_path = state_manager.LOG_PATH
     if not log_path.exists():
         return {"message": "Log file not found."}
@@ -184,11 +181,8 @@ def get_trade_logs(password:str):
         return {"error": str(e)}
 
 @app.get("/status/scheduler", tags=["Status"])
-def get_scheduler_status(password:str):
+def get_scheduler_status():
     """스케줄러 상태를 조회합니다."""
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     job = scheduler.get_job("trading_job")
     if not job:
         return {"is_scheduled": False}
@@ -213,14 +207,11 @@ def get_scheduler_status(password:str):
     }
 
 @app.post("/candles/initialize", tags=["Candles"])
-async def initialize_candle_data(password:str):
+async def initialize_candle_data(password:str, _ = Depends(verify_password)):
     """
     400개의 과거 캔들 데이터를 Upbit에서 가져와 서버에 CSV 파일로 저장합니다.
     (데이터 초기화 용도)
     """
-    if password != pswd:
-        logger.error("Invalid password provided.")
-        return {"status": "error", "message": "Invalid password."}
     try:
         # 1. 데이터 가져오기
         candles_df = trader.fetch_historical_candles_simple()

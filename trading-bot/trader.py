@@ -108,7 +108,9 @@ def fetch_portfolio_state() -> dict:
             "in_position": False,
             "cash": 0.0,
             "position_size": 0.0,
-            "entry_price": 0.0,
+            "position_value": 0.0,
+            "avg_buy_price": 0.0,
+            "total_value": 0.0
         }
 
         target_currency = TICKER.split('-')[1]  # "BTC"
@@ -121,9 +123,10 @@ def fetch_portfolio_state() -> dict:
                 position_size = float(data['balance'])
                 if position_size > 0:
                     portfolio['position_size'] = position_size
+                    portfolio['position_value'] = position_size * float(data['avg_buy_price'])
                     portfolio['in_position'] = True
-                    portfolio['entry_price'] = float(data['avg_buy_price'])
-
+                    portfolio['avg_buy_price'] = float(data['avg_buy_price'])
+        portfolio['total_value'] = portfolio['cash'] + portfolio['position_value']
         return portfolio
     
     except Exception as e:
