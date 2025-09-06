@@ -10,6 +10,7 @@ import pandas as pd
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
+import numpy as np
 # --- 모듈 임포트 ---
 # 각 기능별로 분리된 모듈을 가져옵니다.
 import state_manager
@@ -191,7 +192,9 @@ def get_trade_logs():
         return {"message": "Log file not found."}
     try:
         logs_df = pd.read_csv(log_path)
-        logs_df = logs_df.where(pd.notnull(logs_df), None)
+        # logs_df = logs_df.where(pd.notnull(logs_df), None)
+        logs_df = logs_df.replace({np.nan: None})
+        logs_df = logs_df.replace([np.inf, -np.inf], None).replace({np.nan: None})
         return logs_df.to_dict(orient='records')
     except pd.errors.EmptyDataError:
         return {"message": "Log file is empty."}
