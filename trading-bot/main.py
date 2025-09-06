@@ -15,6 +15,7 @@ import os
 import state_manager
 import predictor
 import trader
+import slack_bot
 
 # --- 기본 설정 ---
 logging.basicConfig(
@@ -86,6 +87,23 @@ def run_trading_logic(signal=None):
 
     # 5. 주문 실행 (from trader)
     trade_log = trader.execute_order(signal, probs, portfolio_state)
+
+    portfolio_state = trader.fetch_portfolio_state()
+    result_message = "알 수 없음"
+    if trade_log['signal'] == 'HOLD':
+        result_message = "포트폴리오 유지"
+    elif trade_log['signal'] == 'BUY':
+        result_message = "매수 주문 체결"
+    elif trade_log['signal'] == 'SELL':
+        result_message = "매도 주문 체결"
+    message = f"""
+*[{result_message}]*
+• 현금: {portfolio_state['cash']:,.6f}원
+• BTC: {portfolio_state['position_value']:,.6f}원({portfolio_state['position_size']:,.6f} BTC)
+• 총 자산: {portfolio_state['total_value']:,.6f}원
+(확률: `손실 {probs[0]:.4f}`, `유지 {probs[1]:.4f}`, `이익 {probs[2]:.4f}`)
+"""
+    slack_bot.post_message(message)
 
     # 6. 상태 저장 (from state_manager)
     state_manager.save_recent_candles(updated_candles)
