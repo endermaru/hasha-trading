@@ -196,8 +196,8 @@ def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
     trade_log['price'] = current_price
 
     # --- 매수 로직 ---
-    # if signal == 'buy' and not portfolio.get('in_position', False): # 물타기, 불타기 방지 가드
-    if signal == 'buy':
+    # if signal == 'BUY' and not portfolio.get('in_position', False): # 물타기, 불타기 방지 가드
+    if signal == 'BUY':
         available_cash = portfolio.get('cash', 0)
         cash_for_buy = available_cash / (1 + TAKER_FEE_RATE)
         
@@ -238,7 +238,10 @@ def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
                     'signal': 'BUY', 
                     'price': avg_price, 
                     'size': executed_volume, 
-                    'fee': fee
+                    'fee': fee,
+                    'prob_loss': prob_loss,
+                    'prob_hold': prob_hold,
+                    'prob_profit': prob_profit
                 }
                 logger.info(f"매수 주문 체결 완료: {trade_log}")
 
@@ -248,7 +251,7 @@ def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
             return trade_log
 
     # --- 매도 로직 ---
-    elif signal == 'sell':
+    elif signal == 'SELL':
         position_size_to_sell = portfolio.get('position_size', 0)
         if position_size_to_sell > 0:
             logger.info(f"매도 신호 확인. 보유 수량({position_size_to_sell}) 전체에 대해 시장가 매도 주문 실행.")
@@ -279,7 +282,10 @@ def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
                         'signal': 'SELL', 
                         'price': avg_price, 
                         'size': executed_volume,
-                        'fee': fee
+                        'fee': fee,
+                        'prob_loss': prob_loss,
+                        'prob_hold': prob_hold,
+                        'prob_profit': prob_profit,
                     }
                     logger.info(f"매도 주문 체결 완료: {trade_log}")
             except Exception as e:
@@ -289,7 +295,7 @@ def execute_order(signal: str, probs: list[float], portfolio: dict) -> dict:
         else:
             logger.info(f"매도 신호를 확인했지만 포지션의 크기가 없습니다: {trade_log}")
             return trade_log
-    elif signal == 'hold':
+    elif signal == 'HOLD':
         logger.info(f"보유 신호 확인. 현재 포지션을 유지합니다: {trade_log}")
         return trade_log
     else:
@@ -335,7 +341,7 @@ def execute_order_dummy(signal: str, probs: list[float], portfolio: dict) -> dic
     trade_log['price'] = current_price
 
     # --- 매수 시뮬레이션 로직 ---
-    if signal == 'buy':
+    if signal == 'BUY':
         available_cash = portfolio.get('cash', 0)
         
         # 전체 현금을 사용하여 매수할 수 있는 최대 주문 금액을 계산
@@ -362,7 +368,7 @@ def execute_order_dummy(signal: str, probs: list[float], portfolio: dict) -> dic
         logger.info(f"[시뮬레이션] 가상 매수 체결 완료: {trade_log}")
 
     # --- 매도 시뮬레이션 로직 ---
-    elif signal == 'sell':
+    elif signal == 'SELL':
         position_size_to_sell = portfolio.get('position_size', 0)
         if position_size_to_sell > 0:
             logger.info(f"[시뮬레이션] 매도 신호 확인. 보유 수량({position_size_to_sell}) 전체에 대해 가상 매도 실행.")
@@ -379,7 +385,7 @@ def execute_order_dummy(signal: str, probs: list[float], portfolio: dict) -> dic
                 'fee': fee
             }
             logger.info(f"[시뮬레이션] 가상 매도 체결 완료: {trade_log}")
-    elif signal == 'hold':
+    elif signal == 'HOLD':
         trade_log = {
             'timestamp': str(pd.Timestamp.now(tz='UTC')), 
             'signal': 'HOLD', 

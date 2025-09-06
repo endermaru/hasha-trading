@@ -1,7 +1,7 @@
 # main.py
 # uvicorn main:app --reload --host 0.0.0.0
 import logging
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, status
+from fastapi import FastAPI, BackgroundTasks, Form, HTTPException, Depends, status, Form
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
 import numpy as np
+import json
 # --- 모듈 임포트 ---
 # 각 기능별로 분리된 모듈을 가져옵니다.
 import state_manager
@@ -85,26 +86,21 @@ def run_trading_logic(signal=None):
     probs = [0.0, 0.0, 0.0]
     if signal == None:
         signal, probs = predictor.generate_signal(updated_candles)
+    else:
+        _, probs = predictor.generate_signal(updated_candles)
 
     # 5. 주문 실행 (from trader)
     trade_log = trader.execute_order(signal, probs, portfolio_state)
 
     portfolio_state = trader.fetch_portfolio_state()
-    result_message = "알 수 없음"
-    if trade_log['signal'] == 'HOLD':
-        result_message = "포트폴리오 유지"
-    elif trade_log['signal'] == 'BUY':
-        result_message = "매수 주문 체결"
+    sched = get_scheduler_status()
+    result_message = "🤖 봇 실행: 포트폴리오 유지"
+    if trade_log['signal'] == 'BUY':
+        result_message = "🤖 봇 실행: 매수 주문 체결"
     elif trade_log['signal'] == 'SELL':
-        result_message = "매도 주문 체결"
-    message = f"""
-*[{result_message}]*
-• 현금: {portfolio_state['cash']:,.6f}원
-• BTC: {portfolio_state['position_value']:,.6f}원({portfolio_state['position_size']:,.6f} BTC)
-• 총 자산: {portfolio_state['total_value']:,.6f}원
-(확률: `손실 {probs[0]:.4f}`, `유지 {probs[1]:.4f}`, `이익 {probs[2]:.4f}`)
-"""
-    slack_bot.post_message(message)
+        result_message = "🤖 봇 실행: 매도 주문 체결"
+    message = slack_bot.make_slack_messages(result_message, portfolio_state, probs, sched)
+    slack_bot.post_message_blocks(message)
 
     # 6. 상태 저장 (from state_manager)
     state_manager.save_recent_candles(updated_candles)
@@ -227,8 +223,40 @@ def get_scheduler_status():
         }
     }
 
+@app.post("/slack", tags=["Status"])
+async def call_slack_bot(payload: str = Form(...)):
+    """슬랙 봇을 호출합니다"""
+    # Slack이 보낸 payload는 URL-encoded된 JSON 문자열이므로 파싱합니다.
+    interaction_data = json.loads(payload)
+    
+    # actions 리스트의 첫 번째 요소에 필요한 정보가 들어있습니다.
+    action = interaction_data.get("actions", [{}])[0]
+    action_id = action.get("action_id")
+    request_id = action.get("value")
+
+    sched = get_scheduler_status()
+    port = trader.fetch_portfolio_state()
+    log_path = state_manager.LOG_PATH
+    logs_recent_10 = pd.read_csv(log_path).tail(10)
+    logs_recent_10 = logs_recent_10.replace({np.nan: None})
+    logs_recent_10 = logs_recent_10.replace([np.inf, -np.inf], None).replace({np.nan: None})
+    probs = logs_recent_10.iloc[-1][['prob_loss', 'prob_hold', 'prob_profit']].tolist() if not logs_recent_10.empty else [0.0, 0.0, 0.0]
+
+    if action_id == "button_get_status":
+        # print(f"요청 ID '{request_id}'가 승인되었습니다.")
+        message = slack_bot.make_slack_messages("💸 현재 상태 조회", port, probs, sched, None)
+        slack_bot.post_message_blocks(message)
+
+
+    elif action_id == "button_get_logs":
+        # print(f"요청 ID '{request_id}'가 반려되었습니다.")
+        message = slack_bot.make_slack_messages("📝 최근 거래 로그", port, probs, sched, logs_recent_10)
+        slack_bot.post_message_blocks(message)
+
+    return
+
 @app.post("/candles/initialize", tags=["Candles"])
-async def initialize_candle_data(password:str, _ = Depends(verify_password)):
+async def initialize_candle_data(_ = Depends(verify_password)):
     """
     400개의 과거 캔들 데이터를 Upbit에서 가져와 서버에 CSV 파일로 저장합니다.
     (데이터 초기화 용도)

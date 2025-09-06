@@ -47,11 +47,11 @@ def generate_signal(candles_4h: pd.DataFrame) -> tuple[str, list[float]]:
     """
     if MODEL is None or SCALER is None:
         logger.error("Predictor is not initialized. Cannot generate signal.")
-        return 'hold', [0.0, 0.0, 0.0]
+        return 'HOLD', [0.0, 0.0, 0.0]
 
     if len(candles_4h) < MIN_CANDLE_COUNT:
         logger.warning(f"Not enough candle data ({len(candles_4h)}) to create features. Need at least {MIN_CANDLE_COUNT}.")
-        return 'hold', [0.0, 0.0, 0.0]
+        return 'HOLD', [0.0, 0.0, 0.0]
 
     logger.info("Creating features for prediction...")
     
@@ -78,14 +78,14 @@ def generate_signal(candles_4h: pd.DataFrame) -> tuple[str, list[float]]:
 
     if len(final_features) < LOOKBACK_WINDOW:
         logger.warning("Not enough data after feature creation to form a sequence.")
-        return 'hold', [0.0, 0.0, 0.0]
+        return 'HOLD', [0.0, 0.0, 0.0]
 
     # 2. 예측에 사용할 마지막 시퀀스 준비
     last_sequence_features = final_features[FIT_FEATURE_NAMES].tail(LOOKBACK_WINDOW)
     
     if len(last_sequence_features) < LOOKBACK_WINDOW:
         logger.warning("Sequence is shorter than lookback window. Skipping prediction.")
-        return 'hold', [0.0, 0.0, 0.0]
+        return 'HOLD', [0.0, 0.0, 0.0]
 
     scaled_features = SCALER.transform(last_sequence_features)
     X = np.array([scaled_features])
@@ -97,13 +97,13 @@ def generate_signal(candles_4h: pd.DataFrame) -> tuple[str, list[float]]:
     
     profit_signal = prob_profit > ENTRY_THRESHOLD
     loss_signal = prob_loss > EXIT_THRESHOLD
-    signal = 'hold'
+    signal = 'HOLD'
 
     # 4. 신호 결정
     if profit_signal and not loss_signal:
-        signal = 'buy'
+        signal = 'BUY'
     elif loss_signal and not profit_signal:
-        signal = 'sell'
+        signal = 'SELL'
     logger.info(f"Prediction probabilities -> Loss: {prob_loss:.4f}, Hold: {prob_hold:.4f}, Profit: {prob_profit:.4f}")
     logger.info(f"Trading signal: {signal}")
 
