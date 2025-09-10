@@ -73,6 +73,23 @@ def make_slack_messages(result_message: str, portfolio_state: dict, probs: list,
             }
         },
         {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*평균 구매가:*\n{portfolio_state['avg_buy_price']:,.2f}원"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*현재 비트코인 가격:*\n{portfolio_state['current_price']:,.2f}원 ({(portfolio_state['current_price'] - portfolio_state['avg_buy_price']) / portfolio_state['avg_buy_price'] * 100 if portfolio_state['avg_buy_price'] > 0 else 0:.2f}%)"
+            }
+        },
+        {
             "type": "context",
             "elements": [
                 {

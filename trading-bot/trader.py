@@ -102,6 +102,7 @@ def fetch_portfolio_state() -> dict:
 
     try:
         balances = upbit.get_balances()
+        current_price = pyupbit.get_current_price("KRW-BTC")
         logger.info(f"Fetched Portfolio data: {balances}")
 
         portfolio = {
@@ -109,6 +110,7 @@ def fetch_portfolio_state() -> dict:
             "cash": 0.0,
             "position_size": 0.0,
             "position_value": 0.0,
+            "current_price": current_price,
             "avg_buy_price": 0.0,
             "total_value": 0.0
         }
@@ -123,7 +125,7 @@ def fetch_portfolio_state() -> dict:
                 position_size = float(data['balance'])
                 if position_size > 0:
                     portfolio['position_size'] = position_size
-                    portfolio['position_value'] = position_size * float(data['avg_buy_price'])
+                    portfolio['position_value'] = position_size * float(current_price)
                     portfolio['in_position'] = True
                     portfolio['avg_buy_price'] = float(data['avg_buy_price'])
         portfolio['total_value'] = portfolio['cash'] + portfolio['position_value']
