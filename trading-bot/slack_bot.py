@@ -286,7 +286,7 @@ def post_graphs(title:str, logs: pd.DataFrame):
             channel=channel_id,
             content=buf.getvalue(),
             filename=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png",
-            initial_comment=f"📄 {df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')} 기준 거래 로그 그래프입니다.",
+            initial_comment=f"📄 {df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')}(UTC) 기준 거래 로그 그래프입니다.",
             title=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png"
         )
         logger.info("✅ 그래프를 성공적으로 업로드했습니다!")
