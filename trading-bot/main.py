@@ -252,7 +252,7 @@ async def call_slack_bot(payload: str = Form(...)):
         # print(f"요청 ID '{request_id}'가 반려되었습니다.")
         # message = slack_bot.make_slack_messages("📝 최근 거래 로그", port, probs, sched, logs_recent_50)
         # slack_bot.post_message_blocks(message)
-        slack_bot.post_graphs("📝 최근 거래 로그", logs_recent_50)
+        slack_bot.post_graphs("Hasha Bot Log(Recent 50 Candles)", logs_recent_50)
 
     return
 
