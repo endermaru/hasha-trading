@@ -237,10 +237,10 @@ async def call_slack_bot(payload: str = Form(...)):
     sched = get_scheduler_status()
     port = trader.fetch_portfolio_state()
     log_path = state_manager.LOG_PATH
-    logs_recent_10 = pd.read_csv(log_path).tail(10)
-    logs_recent_10 = logs_recent_10.replace({np.nan: None})
-    logs_recent_10 = logs_recent_10.replace([np.inf, -np.inf], None).replace({np.nan: None})
-    probs = logs_recent_10.iloc[-1][['prob_loss', 'prob_hold', 'prob_profit']].tolist() if not logs_recent_10.empty else [0.0, 0.0, 0.0]
+    logs_recent_50 = pd.read_csv(log_path).tail(50)
+    logs_recent_50 = logs_recent_50.replace({np.nan: None})
+    logs_recent_50 = logs_recent_50.replace([np.inf, -np.inf], None).replace({np.nan: None})
+    probs = logs_recent_50.iloc[-1][['prob_loss', 'prob_hold', 'prob_profit']].tolist() if not logs_recent_50.empty else [0.0, 0.0, 0.0]
 
     if callback_id == "button_get_status" or action_id == "button_get_status":
         # print(f"요청 ID '{request_id}'가 승인되었습니다.")
@@ -250,8 +250,9 @@ async def call_slack_bot(payload: str = Form(...)):
 
     elif callback_id == "button_get_logs" or action_id == "button_get_logs":
         # print(f"요청 ID '{request_id}'가 반려되었습니다.")
-        message = slack_bot.make_slack_messages("📝 최근 거래 로그", port, probs, sched, logs_recent_10)
-        slack_bot.post_message_blocks(message)
+        # message = slack_bot.make_slack_messages("📝 최근 거래 로그", port, probs, sched, logs_recent_50)
+        # slack_bot.post_message_blocks(message)
+        slack_bot.post_graphs("📝 최근 거래 로그", logs_recent_50)
 
     return
 

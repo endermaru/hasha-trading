@@ -1,15 +1,24 @@
 import requests
-import os
+import os, io
 from dotenv import load_dotenv
 import logging
 from datetime import datetime, timedelta, timezone
 import pandas as pd
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.style as style 
+
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
 
 # .env 파일에서 웹훅 URL 가져오기
 webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+bot_token = os.getenv("SLACK_OAUTH_TOKEN")
+channel_id = os.getenv("SLACK_CHANNEL_ID")
 logger = logging.getLogger(__name__)
 
 slack_menus = [
@@ -225,3 +234,64 @@ def post_message_blocks(blocks: list):
         logger.error(f"Request to Slack failed: {e}")
         if e.response is not None:
             logger.error(f"Response text: {e.response.text}")
+
+def post_graphs(title:str, logs: pd.DataFrame):
+    style.use('seaborn-v0_8-dark-palette')
+    # 1. 데이터 준비 (이전과 동일)
+    df = logs.copy()
+    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    # 2. Matplotlib 그래프 생성 (figure 크기 설정)
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # --- 꺾은선 그래프 그리기 (Seaborn 함수 사용) ---
+    sns.lineplot(data=df, x='timestamp', y='price', ax=ax, linewidth=1.5, label='Price')
+    # sns.lineplot(data=df, x='timestamp', y='price', ax=ax, linewidth=1.5, label='Price', color='white')
+
+    # --- BUY/SELL 신호 마커 표시 ---
+    buy_signals = df[df['signal'] == 'BUY']
+    sell_signals = df[df['signal'] == 'SELL']
+    ax.scatter(buy_signals['timestamp'], buy_signals['price'],
+               marker='^', color='lime', s=150, label='BUY', zorder=5, ec='black') # 색상을 더 밝게
+    ax.scatter(sell_signals['timestamp'], sell_signals['price'],
+               marker='v', color='red', s=150, label='SELL', zorder=5, ec='black') # 테두리 추가
+
+    # 3. 그래프 디자인 및 축 서식 설정
+    price_min = df['price'].min()
+    price_max = df['price'].max()
+    padding = (price_max - price_min) * 0.1
+    ax.set_ylim(price_min - padding, price_max + padding)
+    
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d\n%H:00'))
+    plt.xticks(ha='center')
+
+    ax.set_title(title, fontsize=16, weight='bold')
+    ax.set_ylabel("BTC(₩)", fontsize=12)
+    ax.grid(True, axis='y', which='both', linestyle='--', linewidth=0.5)
+    ax.set_xlabel("")
+
+    ax.legend()
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x / 1_000_000:.1f}M'))
+    fig.tight_layout()
+    fig.show()
+
+    # 슬랙 업로드
+    buf = io.BytesIO()
+    fig.savefig(buf,format='jpg', dpi=80, facecolor=fig.get_facecolor())
+    buf.seek(0)
+    try:
+        client = WebClient(token=bot_token)
+        result = client.files_upload_v2(
+            channel=channel_id,
+            content=buf.getvalue(),
+            filename=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png",
+            initial_comment=f"📄 {df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')} 기준 거래 로그 그래프입니다.",
+            title=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png"
+        )
+        logger.info("✅ 그래프를 성공적으로 업로드했습니다!")
+
+    except SlackApiError as e:
+        logger.error(f"❌ 그래프 업로드 실패: {e.response['error']}")
+    finally:
+        plt.close(fig)
