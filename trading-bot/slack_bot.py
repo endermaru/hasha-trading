@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 import logging
 from datetime import datetime, timedelta, timezone
 import pandas as pd
-from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -274,24 +273,74 @@ def post_graphs(title:str, logs: pd.DataFrame):
     ax.legend()
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x / 1_000_000:.1f}M'))
     fig.tight_layout()
-    fig.show()
+    # fig.show()
 
     # 슬랙 업로드
     buf = io.BytesIO()
     fig.savefig(buf,format='jpg', dpi=80, facecolor=fig.get_facecolor())
     buf.seek(0)
     try:
-        client = WebClient(token=bot_token)
-        result = client.files_upload_v2(
-            channel=channel_id,
-            content=buf.getvalue(),
-            filename=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png",
-            initial_comment=f"📄 {df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')}(UTC) 기준 거래 로그 그래프입니다.",
-            title=f"trading_log_{df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')}.png"
+        # --- 0단계: 파일 준비 ---
+        file_content = buf.getvalue()
+        file_size = len(file_content)
+        ts_for_file = df['timestamp'].iloc[-1].strftime('%Y%m%d_%H%M')
+        ts_for_comment = df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')
+        file_name = f"trading_log_{ts_for_file}.jpg"
+        file_title = file_name
+        comment = f"📄 {ts_for_comment}(UTC) 기준 거래 로그 그래프입니다."
+
+        logger.info(f"'{file_name}' 그래프 업로드를 시작합니다 (크기: {file_size} bytes).")
+
+        # --- 1단계: 업로드 URL 및 파일 ID 요청 ---
+        logger.info("[1단계] 업로드 URL을 요청합니다...")
+        get_url_response = requests.post(
+            url="https://slack.com/api/files.getUploadURLExternal",
+            headers={"Authorization": f"Bearer {bot_token}"},
+            data={"filename": file_name, "length": file_size}
         )
+        get_url_response.raise_for_status()
+        upload_info = get_url_response.json()
+        if not upload_info.get("ok"):
+            raise Exception(f"URL 요청 실패: {upload_info.get('error')}")
+
+        upload_url = upload_info["upload_url"]
+        file_id = upload_info["file_id"]
+        logger.info(f"✅ URL 및 파일 ID 수신 완료! (File ID: {file_id})")
+
+        # --- 2단계: 수신한 URL로 실제 이미지 데이터 업로드 ---
+        logger.info("[2단계] 실제 파일 데이터를 업로드합니다...")
+        upload_response = requests.post(
+            url=upload_url,
+            files={'file': file_content}
+        )
+        upload_response.raise_for_status()
+        logger.info("✅ 파일 데이터 업로드 성공!")
+
+        # --- 3단계: 업로드 완료 처리 ---
+        logger.info("[3단계] 파일 업로드 완료 처리를 요청합니다...")
+        complete_payload = {
+            "files": [{"id": file_id, "title": file_title}],
+            "channel_id": channel_id,
+            "initial_comment": comment
+        }
+        complete_response = requests.post(
+            url="https://slack.com/api/files.completeUploadExternal",
+            headers={
+                "Authorization": f"Bearer {bot_token}",
+                "Content-Type": "application/json; charset=utf-8"
+            },
+            json=complete_payload
+        )
+        complete_response.raise_for_status()
+        completion_data = complete_response.json()
+        if not completion_data.get("ok"):
+            raise Exception(f"업로드 완료 처리 실패: {completion_data.get('error')}")
+
         logger.info("✅ 그래프를 성공적으로 업로드했습니다!")
 
-    except SlackApiError as e:
-        logger.error(f"❌ 그래프 업로드 실패: {e.response['error']}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ 그래프 업로드 실패 (HTTP 요청 오류): {e}")
+    except Exception as e:
+        logger.error(f"❌ 그래프 업로드 실패: {e}")
     finally:
         plt.close(fig)
