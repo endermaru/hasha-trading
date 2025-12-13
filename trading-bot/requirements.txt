@@ -8,5 +8,9 @@ scikit-learn
 pyupbit
 tensorflow-cpu==2.16.1
 protobuf==4.25.3
+dotenv
+slack_sdk
+seaborn
+python-multipart
 
 # pip install fastapi uvicorn[standard] apscheduler pandas numpy==1.26.3 pandas-ta scikit-learn pyupbit tensorflow-cpu==2.16.1 protobuf==4.25.3
