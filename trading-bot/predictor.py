@@ -67,7 +67,7 @@ def generate_signal(candles_4h: pd.DataFrame) -> tuple[str, list[float]]:
     features_1d = daily_resampled.copy()
     features_1d.ta.rsi(length=14, append=True, col_names=('RSI_14_1D',))
     features_1d.ta.sma(length=50, append=True, col_names=('SMA_50_1D',))
-    features_1d.ta.adx(length=14, append=True, col_names=('ADX_14_1D', 'DMP_14_1D', 'DMN_14_1D'))
+    features_1d.ta.adx(length=14, append=True, col_names=('ADX_14_1D', 'DMP_14_1D', 'DMN_14_1D', 'ADXR_14_1D'))
     
     daily_indicator_cols = ['RSI_14_1D', 'SMA_50_1D', 'ADX_14_1D', 'DMP_14_1D', 'DMN_14_1D']
     features_1d_to_merge = features_1d[daily_indicator_cols]
