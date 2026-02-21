@@ -54,15 +54,8 @@ coverage.xml
 # Logs
 *.log
 
-# Big Files
-BTC_data*
-data/data.csv
-
-# Old Files
-data/Old/*
-notebook/data/*
-
 # freq chaning dirs
 trading-bot/data/*
-trading-bot/notebook/data/*
+notebook/data/*.csv
 
+AGENTS.md

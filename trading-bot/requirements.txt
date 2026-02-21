@@ -1,16 +1,14 @@
 fastapi
 uvicorn[standard]
 apscheduler
-pandas
-numpy==1.26.3
-pandas-ta
+numpy>=2.2.6
+pandas>=2.3.2
+pandas-ta==0.4.71b0
 scikit-learn
 pyupbit
-tensorflow-cpu==2.16.1
-protobuf==4.25.3
-dotenv
+tensorflow-cpu==2.20.0
+protobuf>=5.28.0
+python-dotenv
 slack_sdk
 seaborn
 python-multipart
-
-# pip install fastapi uvicorn[standard] apscheduler pandas numpy==1.26.3 pandas-ta scikit-learn pyupbit tensorflow-cpu==2.16.1 protobuf==4.25.3
