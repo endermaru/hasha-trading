@@ -12,3 +12,5 @@ python-dotenv
 slack_sdk
 seaborn
 python-multipart
+pyotp
+jinja2

@@ -57,5 +57,5 @@ coverage.xml
 # freq chaning dirs
 trading-bot/data/*
 notebook/data/*.csv
-
+trading-bot/server.log
 AGENTS.md

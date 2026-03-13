@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trading Bot View</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --line: #dde4ee;
+      --text: #0f172a;
+      --muted: #475569;
+      --buy: #15803d;
+      --sell: #b91c1c;
+      --hold: #1d4ed8;
+      --accent: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 0% 0%, #dbeafe 0%, transparent 35%),
+        radial-gradient(circle at 100% 0%, #ccfbf1 0%, transparent 30%),
+        var(--bg);
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 24px auto 40px;
+      padding: 0 16px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 1.3rem;
+    }
+    .sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .logout-btn, .refresh-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .logout-btn:hover, .refresh-btn:hover { background: #f8fafc; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 0.98rem;
+    }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    .kpi {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+      font-size: 0.92rem;
+    }
+    .kpi div {
+      border: 1px solid #edf2f7;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #fafcff;
+    }
+    .kpi strong {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .signal {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 0.86rem;
+      color: #fff;
+    }
+    .signal.buy { background: var(--buy); }
+    .signal.sell { background: var(--sell); }
+    .signal.hold { background: var(--hold); }
+    .bar-row { margin: 10px 0; }
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .bar {
+      height: 9px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #0891b2, var(--accent));
+      width: 0%;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      min-width: 760px;
+    }
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eef2f7;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+    .status {
+      margin-top: 12px;
+      color: #64748b;
+      font-size: 0.82rem;
+    }
+    .error {
+      margin: 10px 0 0;
+      color: #b91c1c;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    @media (max-width: 900px) {
+      .span-4, .span-6, .span-8 { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <div>
+        <h2>Trading Bot 조회 화면</h2>
+        <p class="sub">현재 예측, 포트폴리오, 스케줄러, 최근 로그를 한 화면에서 조회합니다.</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="refresh-btn" type="button" id="refreshBtn">새로고침</button>
+        <form method="post" action="/auth/logout">
+          <button class="logout-btn" type="submit">로그아웃</button>
+        </form>
+      </div>
+    </div>
+
+    <section class="grid">
+      <article class="card span-4">
+        <h3>예측 신호</h3>
+        <p id="signalBadge" class="signal hold">LOADING</p>
+        <div class="bar-row">
+          <div class="bar-label"><span>Loss</span><span id="probLoss">0.00%</span></div>
+          <div class="bar"><span id="barLoss"></span></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span>Hold</span><span id="probHold">0.00%</span></div>
+          <div class="bar"><span id="barHold"></span></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span>Profit</span><span id="probProfit">0.00%</span></div>
+          <div class="bar"><span id="barProfit"></span></div>
+        </div>
+      </article>
+
+      <article class="card span-4">
+        <h3>포트폴리오 요약</h3>
+        <div id="portfolioGrid" class="kpi"></div>
+      </article>
+
+      <article class="card span-4">
+        <h3>스케줄러</h3>
+        <div id="schedulerGrid" class="kpi"></div>
+      </article>
+
+      <article class="card span-6">
+        <h3>예측 원본(JSON)</h3>
+        <p id="predictionRaw" class="mono">loading...</p>
+      </article>
+
+      <article class="card span-6">
+        <h3>포트폴리오 원본(JSON)</h3>
+        <p id="portfolioRaw" class="mono">loading...</p>
+      </article>
+
+      <article class="card span-12">
+        <h3>최근 로그(20건)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>시간(UTC)</th>
+                <th>신호</th>
+                <th>가격</th>
+                <th>수량</th>
+                <th>수수료</th>
+                <th>Loss</th>
+                <th>Hold</th>
+                <th>Profit</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody">
+              <tr><td colspan="8">loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="errorBox" class="error"></div>
+      </article>
+    </section>
+    <p id="statusLine" class="status">데이터 불러오는 중...</p>
+  </main>
+
+  <script>
+    async function loadJson(url) {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
+      return res.json();
+    }
+
+    function fmtNum(value, digits = 0) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+      return Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
+    }
+
+    function pct(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '0.00%';
+      return (Number(value) * 100).toFixed(2) + '%';
+    }
+
+    function setSignal(signal) {
+      const badge = document.getElementById('signalBadge');
+      const norm = (signal || 'HOLD').toUpperCase();
+      badge.textContent = norm;
+      badge.className = 'signal ' + (norm === 'BUY' ? 'buy' : norm === 'SELL' ? 'sell' : 'hold');
+    }
+
+    function setProbBars(probabilities = {}) {
+      const loss = Number(probabilities.loss || 0);
+      const hold = Number(probabilities.hold || 0);
+      const profit = Number(probabilities.profit || 0);
+
+      document.getElementById('probLoss').textContent = pct(loss);
+      document.getElementById('probHold').textContent = pct(hold);
+      document.getElementById('probProfit').textContent = pct(profit);
+      document.getElementById('barLoss').style.width = Math.max(0, Math.min(100, loss * 100)) + '%';
+      document.getElementById('barHold').style.width = Math.max(0, Math.min(100, hold * 100)) + '%';
+      document.getElementById('barProfit').style.width = Math.max(0, Math.min(100, profit * 100)) + '%';
+    }
+
+    function renderGrid(containerId, rows) {
+      const root = document.getElementById(containerId);
+      root.innerHTML = rows.map((row) => `<div><strong>${row.label}</strong>${row.value}</div>`).join('');
+    }
+
+    function renderLogs(logs) {
+      const body = document.getElementById('logsBody');
+      if (!Array.isArray(logs) || logs.length === 0) {
+        body.innerHTML = '<tr><td colspan="8">로그가 없습니다.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = logs.map((log) => {
+        const signal = (log.signal || '-').toUpperCase();
+        return `
+          <tr>
+            <td>${log.timestamp || '-'}</td>
+            <td>${signal}</td>
+            <td>${fmtNum(log.price)}</td>
+            <td>${fmtNum(log.size, 6)}</td>
+            <td>${fmtNum(log.fee, 6)}</td>
+            <td>${pct(log.prob_loss)}</td>
+            <td>${pct(log.prob_hold)}</td>
+            <td>${pct(log.prob_profit)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function render() {
+      const started = Date.now();
+      document.getElementById('errorBox').textContent = '';
+      try {
+        const prediction = await loadJson('/trade/prediction');
+        const portfolio = await loadJson('/status/portfolio');
+        const scheduler = await loadJson('/status/scheduler');
+        const logs = await loadJson('/status/logs');
+        const recent = Array.isArray(logs) ? logs.slice(-20) : logs;
+
+        setSignal(prediction.signal);
+        setProbBars(prediction.probabilities);
+
+        renderGrid('portfolioGrid', portfolio ? [
+          { label: '총 자산', value: fmtNum(portfolio.total_value) + ' KRW' },
+          { label: '현금', value: fmtNum(portfolio.cash) + ' KRW' },
+          { label: '보유 수량', value: fmtNum(portfolio.position_size, 8) },
+          { label: '포지션 가치', value: fmtNum(portfolio.position_value) + ' KRW' },
+          { label: '평균 매수가', value: fmtNum(portfolio.avg_buy_price) + ' KRW' },
+          { label: '현재가', value: fmtNum(portfolio.current_price) + ' KRW' }
+        ] : [{ label: '상태', value: '포트폴리오 데이터 없음(simulation mode 가능)' }]);
+
+        renderGrid('schedulerGrid', [
+          { label: '스케줄 등록', value: scheduler.is_scheduled ? '등록됨' : '미등록' },
+          { label: '실행 상태', value: scheduler.is_running ? '동작 중' : '정지' },
+          { label: '다음 실행(UTC)', value: scheduler.next_run_time_utc || '-' },
+          { label: '남은 시간', value: (scheduler.time_until_next_run && scheduler.time_until_next_run.str) || '-' }
+        ]);
+
+        document.getElementById('predictionRaw').textContent = JSON.stringify(prediction, null, 2);
+        document.getElementById('portfolioRaw').textContent = JSON.stringify(portfolio, null, 2);
+        renderLogs(recent);
+        document.getElementById('statusLine').textContent = `마지막 갱신: ${new Date().toLocaleString()} (${((Date.now() - started) / 1000).toFixed(2)}s)`;
+      } catch (err) {
+        document.getElementById('errorBox').textContent = '로딩 실패: ' + err.message;
+        document.getElementById('statusLine').textContent = '데이터 로딩 실패';
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', render);
+    render();
+  </script>
+</body>
+</html>
