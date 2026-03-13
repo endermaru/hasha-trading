@@ -33,8 +33,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler(timezone="UTC")
-
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 pswd = os.getenv("pswd")
 
 PIN_HASH = os.getenv("PIN_HASH", "")

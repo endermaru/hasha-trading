@@ -8,3 +8,5 @@ tail -f server.log
 
 ps aux | grep uvicorn
 kill 12345
+
+pip install -r trading-bot/requirements.txt
